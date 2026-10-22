@@ -115,14 +115,24 @@ int APS5_VABI sceNpTrophy2GetTrophyInfoArray(int context, int handle, uint32_t o
 }
 
 int APS5_VABI sceNpTrophy2GetTrophyIcon(int context, int handle, int trophy_id, void* buffer, size_t* size) {
-    (void)context;
-    (void)handle;
-    (void)trophy_id;
-    (void)buffer;
-    if (size != nullptr) {
-        *size = NP_TROPHY2_ICON_SIZE_NONE;
+    if (size == nullptr) {
+        APS5_INVALID_ARG_EX;
     }
-    throw std::runtime_error(std::string(__func__) + ": icon file not found");
+    (void)handle;
+    const auto owner = NpTrophy2::FindContext(context);
+    const auto* package = owner ? NpTrophy2::Package(owner->serviceLabel) : nullptr;
+    if (package == nullptr) {
+        throw std::runtime_error(std::string(__func__) + ": icon file not found");
+    }
+    if (!package->trophies.contains(trophy_id)) {
+        throw std::invalid_argument(std::string(__func__) + ": trophy " + std::to_string(trophy_id) + " is not in " + NpTrophy2::PackagePath(owner->serviceLabel));
+    }
+    const auto icon = package->trophyIcons.find(trophy_id);
+    if (icon == package->trophyIcons.end()) {
+        throw std::runtime_error(std::string(__func__) + ": icon file not found");
+    }
+    NpTrophy2::CopyIcon(__func__, buffer, size, icon->second);
+    return SCE_NP_TROPHY2_OK;
 }
 
 }

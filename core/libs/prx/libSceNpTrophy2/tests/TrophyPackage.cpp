@@ -110,7 +110,8 @@ const char StatsExtraction[] = R"({"statsExtractionRuleArray":[
 ]})";
 
 std::string trophyPackage() {
-    return ucp({{"tropconf.json", TropConf}, {"tropmeta_en-US.json", TropMetaEnglish}, {"tropmeta_fr-FR.json", TropMetaFrench}, {"trop0001.png", "not an image"}});
+    return ucp({{"tropconf.json", TropConf}, {"tropmeta_en-US.json", TropMetaEnglish}, {"tropmeta_fr-FR.json", TropMetaFrench}, {"trop0001.png", "not an image"},
+                {"icon0_en-US.png", "english-icon"}, {"icon0.png", "fallback-icon"}});
 }
 
 std::string statPackage() {
@@ -354,6 +355,58 @@ void testConditions() {
     check(NpTrophy2::ReachedTrophies(package, {{10, 10}, {20, 101}, {30, 0}, {40, 9}}, isUnlocked) == (std::vector<std::int32_t>{2, 3, 4, 5}), "one set of stats did not reach every trophy");
 }
 
+void testIcons() {
+    const auto package = NpTrophy2::ParseTrophyPackage(trophyPackage(), "en-US");
+    check(package.trophyIcons.size() == 1 && package.trophyIcons.at(1) == "not an image" && !package.trophyIcons.contains(0) && !package.trophyIcons.contains(2),
+          "trophy 1's icon was not read, or a trophy with no png has one");
+    check(package.gameIcon == std::string("english-icon"), "the en-US game icon was not chosen over icon0.png");
+    check(NpTrophy2::ParseTrophyPackage(trophyPackage(), "fr-FR").gameIcon == std::string("fallback-icon"), "the game icon did not follow the chosen language");
+    check(NpTrophy2::ParseTrophyPackage(trophyPackage(), "de-DE").gameIcon == std::string("english-icon"), "the game icon did not follow the language the texts use");
+
+    auto data = trophyPackage();
+    auto owned = NpTrophy2::ParseTrophyPackage(data, "en-US");
+    for (char& byte : data) byte = 'x';
+    check(owned.trophyIcons.at(1) == "not an image" && owned.gameIcon == std::string("english-icon"), "icon bytes were not copied out of the container");
+
+    const auto fallbackOnly = ucp({{"tropconf.json", TropConf}, {"tropmeta_en-US.json", TropMetaEnglish}, {"icon0.png", std::string("fall\0back", 9)}});
+    check(NpTrophy2::ParseTrophyPackage(fallbackOnly, "en-US").gameIcon == std::string("fall\0back", 9), "icon0.png was not used when the language icon is absent");
+
+    const auto frenchIcon = ucp({{"tropconf.json", TropConf},
+                                 {"tropmeta_fr-FR.json", TropMetaFrench},
+                                 {"icon0_fr-FR.png", "french-icon"},
+                                 {"icon0_en-US.png", "english-icon"},
+                                 {"icon0.png", "fallback-icon"}});
+    check(NpTrophy2::ParseTrophyPackage(frenchIcon, "fr-FR").gameIcon == std::string("french-icon"), "icon0_<language>.png was not used");
+
+    const auto noisy = ucp({{"tropconf.json", TropConf},
+                            {"tropmeta_en-US.json", TropMetaEnglish},
+                            {"trop0001.png", "kept"},
+                            {"trop00002.png", "wide"},
+                            {"trop0099.png", "unknown"},
+                            {"trop0002.PNG", "case"},
+                            {"trop2.png", "short"},
+                            {"trop000a.png", "word"},
+                            {"grp0001.png", "group"},
+                            {"TROP0003.png", "upper"}});
+    const auto icons = NpTrophy2::ParseTrophyPackage(noisy, "en-US");
+    check(icons.trophyIcons.size() == 1 && icons.trophyIcons.at(1) == "kept" && !icons.trophyIcons.contains(0) && !icons.trophyIcons.contains(2) && !icons.trophyIcons.contains(3) &&
+              !icons.trophyIcons.contains(99) && !icons.gameIcon,
+          "a file that is not trop and four digits was kept as a trophy icon");
+
+    const std::string image("en\0icon", 7);
+    std::size_t size = 1;
+    NpTrophy2::CopyIcon("sceNpTrophy2GetGameIcon", nullptr, &size, image);
+    check(size == image.size(), "a null buffer did not report the icon size");
+    char small[4] = {'Z', 'Z', 'Z', 'Z'};
+    size = 3;
+    auto tooSmall = failure([&] { NpTrophy2::CopyIcon("sceNpTrophy2GetTrophyIcon", small, &size, image); });
+    check(tooSmall == "sceNpTrophy2GetTrophyIcon: the buffer of 3 bytes is too small for 7 bytes" && size == 3 && small[0] == 'Z', "a short buffer was accepted or written");
+    char copied[8] = {};
+    size = sizeof(copied);
+    NpTrophy2::CopyIcon("sceNpTrophy2GetTrophyIcon", copied, &size, image);
+    check(size == image.size() && std::string(copied, size) == image, "the icon bytes were not copied");
+}
+
 void testStatStore() {
     const std::filesystem::path directory("stats");
     {
@@ -422,6 +475,7 @@ int main() {
     testContainer();
     testJson();
     testPackage();
+    testIcons();
     testProgressAndPlatinum();
     testStatRules();
     testConditions();

@@ -64,13 +64,17 @@ int APS5_VABI sceNpTrophy2GetGameInfo(int context, int handle, NpTrophy2GameDeta
 }
 
 int APS5_VABI sceNpTrophy2GetGameIcon(int context, int handle, void* buffer, size_t* size) {
-    (void)context;
-    (void)handle;
-    (void)buffer;
-    if (size != nullptr) {
-        *size = NP_TROPHY2_ICON_SIZE_NONE;
+    if (size == nullptr) {
+        APS5_INVALID_ARG_EX;
     }
-    throw std::runtime_error(std::string(__func__) + ": icon file not found");
+    (void)handle;
+    const auto owner = NpTrophy2::FindContext(context);
+    const auto* package = owner ? NpTrophy2::Package(owner->serviceLabel) : nullptr;
+    if (package == nullptr || !package->gameIcon) {
+        throw std::runtime_error(std::string(__func__) + ": icon file not found");
+    }
+    NpTrophy2::CopyIcon(__func__, buffer, size, *package->gameIcon);
+    return SCE_NP_TROPHY2_OK;
 }
 
 int APS5_VABI sceNpTrophy2RegisterUnlockCallback(void* callback, void* userdata) {

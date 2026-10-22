@@ -435,6 +435,33 @@ void readRule(const Json& rule, std::size_t index, StatRules& rules) {
     rules.events[event->text].push_back({*path, *statId});
 }
 
+std::optional<std::int32_t> trophyIconId(std::string_view name) {
+    if (name.size() != 12 || !name.starts_with("trop") || !name.ends_with(".png")) return std::nullopt;
+    std::int32_t id = 0;
+    for (std::size_t index = 4; index < 8; ++index) {
+        const auto digit = static_cast<unsigned char>(name[index]);
+        if (digit < '0' || digit > '9') return std::nullopt;
+        id = id * 10 + (digit - '0');
+    }
+    return id;
+}
+
+void readIcons(const UcpFiles& files, TrophyPackage& package) {
+    const auto localizedName = "icon0_" + package.language + ".png";
+    const auto localized = files.find(localizedName);
+    if (localized != files.end()) {
+        package.gameIcon = std::string(localized->second);
+    } else {
+        const auto fallback = files.find("icon0.png");
+        if (fallback != files.end()) package.gameIcon = std::string(fallback->second);
+    }
+    for (const auto& [name, bytes] : files) {
+        const auto id = trophyIconId(name);
+        if (!id || !package.trophies.contains(*id)) continue;
+        package.trophyIcons.emplace(*id, std::string(bytes));
+    }
+}
+
 }
 
 const Json* Json::Find(std::string_view key) const {
@@ -563,6 +590,7 @@ TrophyPackage ParseTrophyPackage(std::string_view ucp, std::string_view language
             if (const auto* value = text.Find(key); value != nullptr && value->kind == Json::Kind::String) *field = value->text;
         }
     }
+    readIcons(files, package);
     return package;
 }
 

@@ -85,6 +85,8 @@ struct TrophyPackage {
     std::map<std::int32_t, TrophyDefinition> trophies;
     std::map<std::int32_t, std::string> groups;
     std::vector<std::string> skipped;
+    std::map<std::int32_t, std::string> trophyIcons;
+    std::optional<std::string> gameIcon;
 };
 
 TrophyPackage ParseTrophyPackage(std::string_view ucp, std::string_view language);

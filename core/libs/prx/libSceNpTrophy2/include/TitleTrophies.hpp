@@ -29,6 +29,7 @@ TitleTrophies LoadTitleTrophies(std::uint32_t serviceLabel, std::string_view lan
 const TitleTrophies& Title(std::uint32_t serviceLabel);
 const TrophyPackage* Package(std::uint32_t serviceLabel);
 void CopyText(char* destination, std::size_t size, std::string_view text);
+void CopyIcon(const char* function, void* buffer, std::size_t* size, std::string_view bytes);
 
 using UnlockedQuery = std::function<bool(std::int32_t)>;
 

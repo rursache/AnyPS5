@@ -130,6 +130,18 @@ void CopyText(char* destination, std::size_t size, std::string_view text) {
     destination[length] = '\0';
 }
 
+void CopyIcon(const char* function, void* buffer, std::size_t* size, std::string_view bytes) {
+    if (buffer == nullptr) {
+        *size = bytes.size();
+        return;
+    }
+    if (*size < bytes.size()) {
+        throw std::runtime_error(std::string(function) + ": the buffer of " + std::to_string(*size) + " bytes is too small for " + std::to_string(bytes.size()) + " bytes");
+    }
+    std::memcpy(buffer, bytes.data(), bytes.size());
+    *size = bytes.size();
+}
+
 UnlockedQuery UnlockedBy(std::int32_t userId, std::uint32_t serviceLabel) {
     return [userId, serviceLabel](std::int32_t trophyId) { return TitleStore().UnlockTick(userId, serviceLabel, trophyId).has_value(); };
 }
