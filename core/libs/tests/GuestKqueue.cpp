@@ -340,7 +340,7 @@ static void SocketPair() {
     Require(Apply(kq, Change(static_cast<std::uintptr_t>(pair[1]), EvfiltWrite, EvAdd | EvOneshot)) == 0);
     Require(Wait(kq, events, 4) == 1 && events[0].filter == EvfiltWrite);
     RequireFailure(Apply(kq, Change(static_cast<std::uintptr_t>(pair[1]), EvfiltWrite, EvDelete)), GuestEnoent);
-#ifndef __linux__
+#ifdef _WIN32
     Require(Throws([kq, &pair] { Apply(kq, Change(static_cast<std::uintptr_t>(pair[1]), EvfiltRead, EvAdd | EvClear)); }));
 #endif
     const int space = kqueue_nid_postfix();
@@ -546,7 +546,7 @@ static void LowWaterMarks() {
     Require(close_nid_postfix(kq) == 0);
 }
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 static void EdgeTriggeredSocketRead() {
     const int kq = kqueue_nid_postfix();
     int pair[2];
@@ -640,6 +640,7 @@ static void EdgeTriggeredSocketWrite() {
     Require(close_nid_postfix(kq) == 0);
 }
 
+#ifdef __linux__
 static void SocketWriteLowWaterWhileFilling() {
     const int kq = kqueue_nid_postfix();
     int pair[2];
@@ -682,6 +683,7 @@ static void SocketWriteLowWaterWhileFilling() {
     Require(close_nid_postfix(pair[0]) == 0 && close_nid_postfix(pair[1]) == 0);
     Require(close_nid_postfix(kq) == 0);
 }
+#endif
 
 static void EdgeTriggeredPipeRead() {
     const int kq = kqueue_nid_postfix();
@@ -813,7 +815,7 @@ static void Errors() {
 #ifdef __APPLE__
     Require(Throws([kq, &pipe] { Apply(kq, Change(static_cast<std::uintptr_t>(pipe[1]), EvfiltWrite, EvAdd)); }));
 #endif
-#ifndef __linux__
+#ifdef _WIN32
     Require(Throws([kq, &pipe] { Apply(kq, Change(static_cast<std::uintptr_t>(pipe[0]), EvfiltRead, EvAdd | EvClear)); }));
 #endif
     Require(close_nid_postfix(pipe[0]) == 0 && close_nid_postfix(pipe[1]) == 0);
@@ -1144,10 +1146,12 @@ int main() {
     UserEvents();
     WatchKqueue();
     SocketPair();
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     EdgeTriggeredSocketRead();
     EdgeTriggeredSocketWrite();
+#ifdef __linux__
     SocketWriteLowWaterWhileFilling();
+#endif
     EdgeTriggeredPipeRead();
     EdgeTriggeredDispatch();
 #endif
